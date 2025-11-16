@@ -5,11 +5,11 @@ RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://
 WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 
-RUN pip install --no-cache-dir poetry && \
+RUN pip install --timeout 600 --no-cache-dir poetry && \
     poetry config virtualenvs.create false && \
     poetry install --no-root --no-interaction --no-ansi
-
 COPY . .
 ENV PORT=8000
 EXPOSE 8000
-CMD ["sh", "-c", "uvicorn service:app --host 0.0.0.0 --port ${PORT} --reload"]
+# Создайте скрипт запуска
+CMD ["sh", "-c", "sleep 30 && uvicorn service:app --host 0.0.0.0 --port ${PORT} --reload"]

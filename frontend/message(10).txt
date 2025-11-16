@@ -1,0 +1,330 @@
+import React, { useState } from 'react';
+import { Upload, FileText, AlertCircle, CheckCircle, XCircle, Info } from 'lucide-react';
+
+const API_URL = 'http://localhost:8000'; // Измените на ваш URL
+
+const ScriptAnalyzer = () => {
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileSelect = (selectedFile) => {
+    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    
+    if (!validTypes.includes(selectedFile.type)) {
+      setError('Пожалуйста, загрузите файл формата PDF, DOCX или TXT');
+      return;
+    }
+    
+    setFile(selectedFile);
+    setError(null);
+    setResult(null);
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileSelect(e.target.files[0]);
+    }
+  };
+
+  const analyzeFile = async () => {
+    if (!file) return;
+
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(`${API_URL}/analyze_file`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Ошибка при анализе файла');
+      }
+
+      const data = await response.json();
+      setResult(data);
+    } catch (err) {
+      setError(err.message || 'Произошла ошибка при анализе');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getRatingColor = (rating) => {
+    if (rating <= 6) return 'bg-green-500';
+    if (rating <= 12) return 'bg-blue-500';
+    if (rating <= 16) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  const getSeverityColor = (severity) => {
+    if (severity === 'none') return 'text-gray-500';
+    if (severity === 'mild') return 'text-yellow-600';
+    if (severity === 'moderate') return 'text-orange-600';
+    return 'text-red-600';
+  };
+
+  const getCategoryName = (category) => {
+    const names = {
+      violence: 'Насилие',
+      erotica: 'Эротика',
+      profanity: 'Ненормативная лексика',
+      substances: 'Вещества',
+      scary: 'Страшный контент'
+    };
+    return names[category] || category;
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
+            Анализатор возрастного рейтинга
+          </h1>
+          <p className="text-gray-300 text-lg">
+            Загрузите сценарий для автоматического определения возрастного рейтинга
+          </p>
+        </div>
+
+        {/* Upload Section */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8 border border-white/20 shadow-2xl">
+          <div
+            className={`border-2 border-dashed rounded-xl p-12 text-center transition-all ${
+              dragActive 
+                ? 'border-purple-400 bg-purple-500/20' 
+                : 'border-gray-500 hover:border-purple-400 hover:bg-white/5'
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            <Upload className="mx-auto mb-4 text-purple-400" size={64} />
+            <h3 className="text-2xl font-semibold mb-2">
+              Перетащите файл сюда
+            </h3>
+            <p className="text-gray-400 mb-4">или</p>
+            <label className="inline-block">
+              <input
+                type="file"
+                accept=".pdf,.docx,.txt"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <span className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg cursor-pointer transition-colors inline-block font-medium">
+                Выберите файл
+              </span>
+            </label>
+            <p className="text-sm text-gray-400 mt-4">
+              Поддерживаемые форматы: PDF, DOCX, TXT
+            </p>
+          </div>
+
+          {file && (
+            <div className="mt-6 flex items-center justify-between bg-white/5 p-4 rounded-lg border border-white/10">
+              <div className="flex items-center gap-3">
+                <FileText className="text-purple-400" size={24} />
+                <span className="font-medium">{file.name}</span>
+                <span className="text-sm text-gray-400">
+                  ({(file.size / 1024).toFixed(1)} KB)
+                </span>
+              </div>
+              <button
+                onClick={analyzeFile}
+                disabled={loading}
+                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Анализ...' : 'Анализировать'}
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg flex items-center gap-3">
+              <XCircle className="text-red-400" size={24} />
+              <span>{error}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Results Section */}
+        {loading && (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-400 mb-4"></div>
+            <p className="text-xl text-gray-300">Анализируем сценарий...</p>
+          </div>
+        )}
+
+        {result && (
+          <div className="space-y-6">
+            {/* Overall Rating */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 shadow-2xl">
+              <h2 className="text-3xl font-bold mb-6">Результаты анализа</h2>
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="bg-white/5 p-6 rounded-xl border border-white/10">
+                  <p className="text-gray-400 mb-2">Возрастной рейтинг</p>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-5xl font-bold px-4 py-2 rounded-lg ${getRatingColor(result.rating_int)}`}>
+                      {result.rating}
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-white/5 p-6 rounded-xl border border-white/10">
+                  <p className="text-gray-400 mb-2">Всего сцен</p>
+                  <p className="text-4xl font-bold">{result.scenes_total}</p>
+                </div>
+                <div className="bg-white/5 p-6 rounded-xl border border-white/10">
+                  <p className="text-gray-400 mb-2">Проблемных сцен</p>
+                  <p className="text-4xl font-bold text-yellow-400">{result.scenes_with_violations}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Categories Overview */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 shadow-2xl">
+              <h3 className="text-2xl font-bold mb-6">Анализ по категориям</h3>
+              <div className="space-y-4">
+                {Object.entries(result.per_category).map(([category, data]) => (
+                  <div key={category} className="bg-white/5 p-5 rounded-xl border border-white/10">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-lg font-semibold">{getCategoryName(category)}</span>
+                      <span className={`text-sm font-medium ${getSeverityColor(data.max_severity)}`}>
+                        {data.max_severity === 'none' ? 'Отсутствует' : 
+                         data.max_severity === 'mild' ? 'Легкая' :
+                         data.max_severity === 'moderate' ? 'Умеренная' : 'Серьезная'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-400">Эпизодов:</span>
+                        <span className="ml-2 font-medium">{data.episodes}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">% сцен:</span>
+                        <span className="ml-2 font-medium">{(data.scene_percent * 100).toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Problem Scenes */}
+            {result.problem_scenes && result.problem_scenes.length > 0 && (
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 shadow-2xl">
+                <h3 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                  <AlertCircle className="text-yellow-400" size={28} />
+                  Проблемные сцены и рекомендации
+                </h3>
+                <div className="space-y-6">
+                  {result.problem_scenes.map((scene, idx) => (
+                    <div key={idx} className="bg-white/5 rounded-xl p-6 border border-white/10">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-xl font-semibold">Сцена #{scene.scene_id + 1}</h4>
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getRatingColor(scene.scene_age)}`}>
+                          {scene.scene_age}+
+                        </span>
+                      </div>
+
+                      {scene.issues && scene.issues.length > 0 && (
+                        <div className="space-y-4 mb-4">
+                          {scene.issues.map((issue, issueIdx) => (
+                            <div key={issueIdx} className="bg-white/5 p-4 rounded-lg border border-white/10">
+                              <div className="flex items-start gap-3 mb-2">
+                                <Info className="text-blue-400 mt-1 flex-shrink-0" size={20} />
+                                <div className="flex-1">
+                                  <p className="font-medium text-blue-300 mb-1">
+                                    {getCategoryName(issue.category)} - {
+                                      issue.severity === 'mild' ? 'Легкая' :
+                                      issue.severity === 'moderate' ? 'Умеренная' : 'Серьезная'
+                                    }
+                                  </p>
+                                  {issue.offending_fragments && issue.offending_fragments.length > 0 && (
+                                    <p className="text-sm text-gray-400 mb-2">
+                                      Проблемные фрагменты: {issue.offending_fragments.slice(0, 5).join(', ')}
+                                    </p>
+                                  )}
+                                  <p className="text-sm text-gray-300">{issue.suggestion}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {scene.scene_suggestion && (
+                        <div className="bg-green-500/10 border border-green-500/30 p-4 rounded-lg mb-4">
+                          <div className="flex items-start gap-3">
+                            <CheckCircle className="text-green-400 mt-1 flex-shrink-0" size={20} />
+                            <div>
+                              <p className="font-medium text-green-300 mb-1">Рекомендация:</p>
+                              <p className="text-sm text-gray-300">{scene.scene_suggestion}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <details className="mt-4">
+                        <summary className="cursor-pointer text-purple-400 hover:text-purple-300 font-medium mb-2">
+                          Показать текст сцены
+                        </summary>
+                        <div className="bg-black/30 p-4 rounded-lg mt-2 overflow-x-auto">
+                          <pre className="text-sm whitespace-pre-wrap text-gray-300" 
+                               dangerouslySetInnerHTML={{ 
+                                 __html: scene.highlighted_text_snippet || scene.text_snippet 
+                               }} 
+                          />
+                        </div>
+                      </details>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        mark {
+          background-color: rgba(239, 68, 68, 0.3);
+          color: #fca5a5;
+          padding: 2px 4px;
+          border-radius: 3px;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default ScriptAnalyzer;

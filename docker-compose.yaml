@@ -1,18 +1,39 @@
+version: "3.9"
+
 services:
   ml-stankin-app:
-    build: .
+    build: ./backend
+    container_name: ml-stankin-app
     environment:
       PORT: 8000
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
-      - ./models:/app/models    
-      - ./data:/app/data        
+      - ./backend:/app
+      - ./models:/app/models
+      - ./data:/app/data
     working_dir: /app
     command: uvicorn service:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - ml-stankin-network
+
+  frontend:
+    build: ./frontend
+    container_name: ml-stankin-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      BROWSER: "none"
+    working_dir: /app
+    command: npm start
+    depends_on:
+      - ml-stankin-app
+    networks:
+      - ml-stankin-network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
 networks:
   ml-stankin-network:
