@@ -1,0 +1,19 @@
+services:
+  ml-stankin-app:
+    build: .
+    environment:
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./models:/app/models    
+      - ./data:/app/data        
+    working_dir: /app
+    command: uvicorn service:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - ml-stankin-network
+
+networks:
+  ml-stankin-network:
+    driver: bridge
